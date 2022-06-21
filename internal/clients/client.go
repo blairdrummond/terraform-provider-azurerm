@@ -19,6 +19,7 @@ import (
 	automation "github.com/hashicorp/terraform-provider-azurerm/internal/services/automation/client"
 	azureStackHCI "github.com/hashicorp/terraform-provider-azurerm/internal/services/azurestackhci/client"
 	batch "github.com/hashicorp/terraform-provider-azurerm/internal/services/batch/client"
+	billing "github.com/hashicorp/terraform-provider-azurerm/internal/services/billing/client"
 	blueprints "github.com/hashicorp/terraform-provider-azurerm/internal/services/blueprints/client"
 	bot "github.com/hashicorp/terraform-provider-azurerm/internal/services/bot/client"
 	cdn "github.com/hashicorp/terraform-provider-azurerm/internal/services/cdn/client"
@@ -130,6 +131,7 @@ type Client struct {
 	Automation            *automation.Client
 	AzureStackHCI         *azureStackHCI.Client
 	Batch                 *batch.Client
+	Billing               *billing.Client
 	Blueprints            *blueprints.Client
 	Bot                   *bot.Client
 	Cdn                   *cdn.Client
@@ -243,6 +245,7 @@ func (client *Client) Build(ctx context.Context, o *common.ClientOptions) error 
 	client.Automation = automation.NewClient(o)
 	client.AzureStackHCI = azureStackHCI.NewClient(o)
 	client.Batch = batch.NewClient(o)
+	client.Billing = billing.NewClient(o)
 	client.Blueprints = blueprints.NewClient(o)
 	client.Bot = bot.NewClient(o)
 	client.Cdn = cdn.NewClient(o)

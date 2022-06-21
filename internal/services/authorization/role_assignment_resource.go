@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/preview/authorization/mgmt/2020-04-01-preview/authorization"
+	"github.com/Azure/azure-sdk-for-go/services/preview/billing/mgmt/2020-05-01-preview/billing"
 	"github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2021-01-01/subscriptions"
 	"github.com/hashicorp/go-azure-helpers/resourcemanager/commonids"
 	"github.com/hashicorp/go-uuid"
@@ -15,6 +16,7 @@ import (
 	"github.com/hashicorp/terraform-provider-azurerm/helpers/tf"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/services/authorization/parse"
+	billingParse "github.com/hashicorp/terraform-provider-azurerm/internal/services/billing/parse"
 	billingValidate "github.com/hashicorp/terraform-provider-azurerm/internal/services/billing/validate"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/suppress"
@@ -56,6 +58,8 @@ func resourceArmRoleAssignment() *pluginsdk.Resource {
 				ForceNew: true,
 				ValidateFunc: validation.Any(
 					billingValidate.EnrollmentID,
+					billingValidate.MicrosoftCustomerAccountBillingScopeID,
+					billingValidate.MicrosoftPartnerAccountBillingScopeID,
 					commonids.ValidateManagementGroupID,
 					commonids.ValidateSubscriptionID,
 					commonids.ValidateResourceGroupID,
@@ -156,6 +160,7 @@ func resourceArmRoleAssignmentCreate(d *pluginsdk.ResourceData, meta interface{}
 			return fmt.Errorf("loading Role Definition List: %+v", err)
 		}
 		if len(roleDefinitions.Values()) != 1 {
+			fmt.Println(roleDefinitions.Values())
 			return fmt.Errorf("loading Role Definition List: could not find role '%s'", roleName)
 		}
 		roleDefinitionId = *roleDefinitions.Values()[0].ID
@@ -227,15 +232,37 @@ func resourceArmRoleAssignmentCreate(d *pluginsdk.ResourceData, meta interface{}
 		return err
 	}
 
-	read, err := roleAssignmentsClient.Get(ctx, scope, name, tenantId)
+	var roleAssignmentID *string
+	if strings.HasPrefix(scope, "/providers/Microsoft.Billing") {
+		billingClient := meta.(*clients.Client).Billing.RoleAssignmentsClient
+		var read billing.RoleAssignment
+
+		if id, err := billingParse.MicrosoftCustomerAccountBillingScopeID(scope); err == nil {
+			read, err = billingClient.GetByInvoiceSection(ctx, id.BillingAccountName, id.BillingProfileName, id.InvoiceSectionName, name)
+			if err != nil {
+				return err
+			}
+			roleAssignmentID = read.ID
+		} else if _, err := billingParse.MicrosoftPartnerAccountBillingScopeID(scope); err == nil {
+			// TODO
+		} else if _, err := billingParse.EnrollmentBillingScopeID(scope); err == nil {
+			// TODO
+		}
+
+	} else {
+		var read authorization.RoleAssignment
+		read, err = roleAssignmentsClient.Get(ctx, scope, name, tenantId)
+		roleAssignmentID = read.ID
+	}
+
 	if err != nil {
 		return err
 	}
-	if read.ID == nil {
+	if roleAssignmentID == nil {
 		return fmt.Errorf("Cannot read Role Assignment ID for %q (Scope %q)", name, scope)
 	}
 
-	d.SetId(parse.ConstructRoleAssignmentId(*read.ID, tenantId))
+	d.SetId(parse.ConstructRoleAssignmentId(*roleAssignmentID, tenantId))
 	return resourceArmRoleAssignmentRead(d, meta)
 }
 

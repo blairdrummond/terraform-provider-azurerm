@@ -121,9 +121,35 @@ func RoleAssignmentID(input string) (*RoleAssignmentId, error) {
 		}
 		roleAssignmentId.Name = idParts[1]
 		roleAssignmentId.ManagementGroup = strings.TrimPrefix(idParts[0], "/providers/Microsoft.Management/managementGroups/")
+	case strings.HasPrefix(input, "/providers/Microsoft.Billing/"):
+		id, err := azure.ParseAzureResourceID(input)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse %q as Azure resource ID", input)
+		}
+
+		if id.Provider != "Microsoft.Billing" {
+			return nil, fmt.Errorf("Expected Microsoft.Billing provider, got: %s", id.Provider)
+		}
+
+		roleAssignmentId.ResourceProvider = id.Provider
+
+		inputRequest := strings.TrimPrefix("/providers/Microsoft.Billing/", input)
+		fmt.Printf("LOG: %s", inputRequest)
+
+		// Reference:
+		// POST /providers/Microsoft.Billing/billingAccounts/{billingAccountName}/billingProfiles/{billingProfileName}/invoiceSections/{invoiceSectionName}/createBillingRoleAssignment?api-version=2019-10-01-preview
+		// var billingAccount, billingProfile, invoiceSection string
+		// if strings.HasPrefix("billingAccounts/", inputRequest) {
+		// 	inputRequest = strings.TrimPrefix("billingAccounts/", inputRequest)
+		// 	billingAccount = strings.Split(inputRequest, "/")[0]
+		// }
+
+		// POST https://management.azure.com/providers/Microsoft.Billing/billingAccounts/{billingAccountName}/billingProfiles/{billingProfileName}/invoiceSections/{invoiceSectionName}/createBillingRoleAssignment?api-version=2019-10-01-preview
+
 	default:
 		return nil, fmt.Errorf("could not parse Role Assignment ID %q", input)
 	}
 
+	fmt.Printf("LOG: %s", input)
 	return &roleAssignmentId, nil
 }
